@@ -1,0 +1,675 @@
+<p>#Paso del modelo entidad-relación al modelo lógico</p>
+
+<p>#Índice</p>
+
+<p>[TOC]</p>
+
+<p>#Introducción
+Vamos a ver el paso del MER a tablas o también el paso de tablas a MER. En todos los libros, el modelo de trabajo es: partiendo de la especificación de requisitos realizamos el MER; del MER obtenemos de manera automatizada las tablas y con estas hacemos la BD, también de manera automatizada. Sin embargo, hay diseñadores a los que les gusta hacer directamente las tablas, sobre todo si el problema no es muy grande. A veces, en este último caso hay que hacer el MER, porque estamos en una prueba (oposición, prueba para obtener un trabajo, etc) o porque el cliente nos lo exige, en este último caso, hay diseñadores que a partir de las tablas, obtienen el MER. En este documento veremos tanto del paso de MER a tablas como el de tablas a MER.</p>
+
+<p>#Notas
+En color azul: atributos que añadimos a las tablas para representar una relación.
+En color rojo: partes del MER que no pueden expresar las tablas.
+En color verde: pasos que debemos seguir para convertir una relación en tablas.</p>
+
+<p>CP: Clave Principal
+CAJ: Clave Ajena
+CALT: Clave Alternativa
+VNN: Valores no nulos
+UNIQUE: Valores únicos (índice)</p>
+
+<p>MER: Modelo Entidad Relación</p>
+
+<p>Las CP se han definido como VNN ya que es lo que dice el estándar SQL, aunque en MySQL no es obligatorio hacerlo.</p>
+
+<p>Suponemos que nuestro SGBD tiene disponibles las restricciones de integridad de CP, CAJ, CALT, VNN y UNIQUE.</p>
+
+<p>VNN → No permite valores nulos
+UNIQUE → No permite valores repetidos, pero sí permite nulos
+CP → UNIQUE + VNN
+CALT → CP
+CAJ → El valor debe estar en el campo y la tabla referenciados. Sí permite nulos.</p>
+
+<p>Dependiendo del SGBD que usemos, incluso del motor de BD dentro de ese SGBD podemos tener más o menos restricciones de integridad disponibles.</p>
+
+<p>#Entidades
+<img src="/downloads/Entidad.png" alt="Entidad" />
+```Ruby
+EMPLEADO (
+	DNI     VARCHAR(10) VNN
+	Nombre  VARCHAR(50) VNN
+	Ape_1   VARCHAR(50) VNN
+	Ape_2   VARCHAR(50) VNN
+	NSS     VARCHAR(10) VNN
+	Fecha_nac  DATE()
+	Sueldo:    Decimal(7,2)
+	Telefono   VARCHAR(12)</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>CP(DNI)
+UNIQUE(NSS) ) ``` El atributo Teléfono no lo hemos hecho multivaluado. Veremos más adelante cómo conseguirlo. #Relaciones N:M ##Relación (0,N)-(0,M) ![Relación (0,N)-(0,M)](/downloads/Relación_NM_0N_0M.png) ```Ruby Empleado (
+IdEmp   INT         VNN
+Nombre  VARCHAR(50) VNN
+CP(IdEmp) Puesto (
+IdP  INT  VNN
+Desc VARCHAR(50)
+CP(IdP) ) Ocupa (
+Empleado: INT VNN
+Puesto:   INT VNN
+Turno:    VARCHAR(50) VNN
+CP(Empleado,Puesto)
+CAJ Empleado-&gt;Empleado.IdEmp
+CAJ Puesto  -&gt;Puesto.CodP ) ``` **NOTAS:** - En todos los casos el atributo turno se va a la tabla nueva. - Las CAJ se definen como VNN porque la CP es la unión de las dos CP de cada una de las tablas. Cuando la CP es la unión de dos campos, se permite que sólo uno de ellos pueda ser nulo. Para evitar que podamos dejar uno de los campos de la CP en nulo, les pondremos VNN. - El atributo obligatorio Turno se define como VNN. Si fuera opcional, no se haría.
+</code></pre>
+</div>
+
+<p><strong>Resumen:</strong>
+- Crear una tabla nueva con las CP de cada una de las tablas y definirlas como CAJ y VNN. Definir como CP de la nueva tabla la unión de las dos CP de cada una de las tablas.</p>
+
+<p>##Relación (1,N)-(0,M)
+<img src="/downloads/Relación_NM_1N_0M.png" alt="Relación (1,N)-(0,M)" />
+La solución es exáctamente igual que la anterior ya que en ningún caso podemos representar las restricciones 1,N con las restricciones que tenemos disponible. Como norma general, no se usarán restricciones 1,N, pero si es imprescindible, tendremos que hacer que esa restricción se cumpla desde la aplicación o desde disparadores en la propia BD.
+Para que esta restricción se cumpla desde la aplicación debemos comprobar que:
+1. Cada vez que se cree un <em>Puesto</em>, deberá tener ya asignado un empleado
+2. Cada vez que se borre un <em>Empleado</em>, se deberá comprobar si es el último empleado asignado a un puesto. En tal caso, no se permitirá el borrado de dicho empleado.</p>
+
+<p>##Relación (0,N)-(1,M)
+<img src="/downloads/Relación_NM_0N_1M.png" alt="Relación (0,N)-(1,M)" />
+Es el mismo caso anterior pero con la restricción 1,M, que no se puede cumplir al otro lado.</p>
+
+<p>##Relación (1,N)-(1,M)
+<img src="/downloads/Relación_NM_1N_1M.png" alt="Relación (1,N)-(1,M)" />
+Al igual que en los dos casos anteriores, la restricciones 1,N y 1,M no se pueden cumplir.</p>
+
+<p>##Expansión de la CP de la nueva tabla
+En las relaciones muchos a muchos la CP es la unión de las dos CPs de las tablas relacionadas.
+En todas las relaciones muchos a muchos debemos preguntarnos si la CP es correcta o debemos expandirla añadiendo otros atributos.
+Por ejemplo, supongamos la relación muchos a muchos entre las entidades <em>Autor</em> y <em>Libro</em> en la que un autor puede escribir cero o muchos libros y un libro puede haber sido escrito por cero o muchos autores. Se ha añadido el  atributo opcional <em>NumeroDeOrden</em> que cuando un libro ha sido escrito por varios autores, nos indica el número de orden en el que cada autor aparece en el libro (ese número de orden es importante).</p>
+
+<p><img src="/downloads/Relación_NM_0N_0M_ExplansionCP_Autor_Libro.png" alt="Expansión de la CP. Ejemplo de Autores y Libros" />
+En este caso debemos preguntarnos si un autor concreto puede escribir un libro concreto más de una vez. Como la respuesta más razonable es que no, podemos dejar la CP de la nueva tabla <em>Escribe</em> como la unión de las CP de las dos tablas relacionadas:
+<code class="highlighter-rouge">Ruby
+Autor (
+	IdAutor INT         VNN
+	Nombre  VARCHAR(50) VNN
+    CP(IdAutor)
+Libro (
+	IdLibro INT         VNN
+	Titulo  VARCHAR(50) VNN
+	CP(IdLibro)
+)
+Escribe (
+	Autor INT VNN
+	Libro INT VNN
+	NumeroDeOrden INT
+	CP(Autor,Libro)
+	CAJ Autor-&gt;Autor.IdAutor
+	CAJ Libro-&gt;Ejemplar.IdEjemplar
+)
+</code>
+Esto no siempre es así. Consideremos ahora una biblioteca en la que un usuario puede sacar cero o muchos ejemplares de un libro en préstamo y un ejemplar puede haber sido sacado por cero o muchos usuarios de la biblioteca. Cuando un ejemplar de un libro es sacado en préstamo nos interesa saber la fecha de préstamo, que es un atributo obligatorio, y la fecha de devolución, que inicialmente es nulo hasta que se devuelve el libro.
+<img src="/downloads/Relación_NM_0N_0M_ExplansionCP_Usuario_Ejemplar_CP_No_Expandida.png" alt="Relación_NM_0N_0M_ExplansionCP_Usuario_Ejemplar_CP_No_Expandida.png" />
+En este caso, el modelo lógico quedaría:
+<code class="highlighter-rouge">Ruby
+Usuario (
+	IdUsuario INT         VNN
+	Nombre    VARCHAR(50) VNN
+    CP(IdUsuario)
+Ejemplar (
+	IdEjemplar INT         VNN
+	Estado     VARCHAR(50)
+	CP(IdEjemplar)
+)
+Prestamo (
+	Autor    INT VNN
+	Ejemplar INT VNN
+	FechaPrestamo   Date VNN
+    FechaDevolucion Date
+	CP(Autor,Ejemplar)
+	CAJ Autor-&gt;   Autor.IdAutor
+	CAJ Ejemplar-&gt;Ejemplar.IdEjemplar
+)
+</code>
+Como en el caso anterior, debemos preguntarnos si es necesario ampliar la CP de la nueva tabla: ¿Es posible que un mismo usuario saque más de una vez el mismo ejemplar de un libro? En este caso la respuesta es afirmativa, por lo que es necesario ampliar la CP.
+El nuevo modelo entidad-relación, quedaría así:</p>
+
+<p><img src="/downloads/Relación_NM_0N_0M_ExplansionCP_Usuario_Ejemplar_CP_Expandida.png" alt="Relación_NM_0N_0M_ExplansionCP_Usuario_Ejemplar_CP_Expandida.png" />
+Y la tabla préstamo:
+<code class="highlighter-rouge">Ruby
+Prestamo (
+	Autor    INT VNN
+	Ejemplar INT VNN
+	FechaPrestamo   Date VNN
+    FechaDevolucion Date
+	CP(Autor,Ejemplar,FechaPrestamo)
+	CAJ Autor-&gt;   Autor.IdAutor
+	CAJ Ejemplar-&gt;Libro.IdEjemplar
+)
+</code>
+Como antes, cabe preguntarse ahora:  ¿Es posible que un mismo usuario saque más de una vez el mismo ejemplar de un libro en la misma fecha? Si la respuesta es afirmativa, tendríamos que volver a amplicar la CP.</p>
+
+<p>En los casos en los que la CP es demasiado compleja, se puede simplificar con un campo nuevo autonumérico de la siguiente manera:
+<code class="highlighter-rouge">Ruby
+Prestamo (
+    IdPrestamo INT VNN AUTONUMERICO
+	Autor      INT VNN
+	Ejemplar   INT VNN
+	FechaPrestamo   Date VNN
+    FechaDevolucion Date
+	CP(IdPrestamo)
+	CAJ Autor-&gt;   Autor.IdAutor
+	CAJ Ejemplar-&gt;Libro.IdEjemplar
+)
+</code></p>
+
+<p>#Relaciones 1:N
+##Relación (0,1)-(0,N)</p>
+
+<p>![Relación_1N_01<em>0N.png](/downloads/Relación_1N_01_0N.png)
+<code class="highlighter-rouge">Ruby
+Empleado (
+	IdEmp   INT         VNN
+	Nombre  VARCHAR(50) VNN
+    CP(IdEmp)
+Puesto (
+	IdP  INT  VNN
+	Desc VARCHAR(50)
+    Empleado INT                      #Ocupa
+	CP(IdP)
+    CAJ Empleado-&gt;Empleado.IdEmpleado #Ocupa
+)
+</code>
+En este caso indicamos con el comentario _#Ocupa</em> los cambios que hemos hecho en las tablas para representar la relación <em>Ocupa</em>.</p>
+
+<p><strong>Resumen:</strong>
+- Pasar la CP del lado uno al lado muchos como clave ajena.</p>
+
+<p>##Relación (1,1)-(0,N)</p>
+
+<p>![Relación_1N_11<em>0N.png](/downloads/Relación_1N_11_0N.png)
+<code class="highlighter-rouge">Ruby
+Empleado (
+	IdEmp   INT         VNN
+	Nombre  VARCHAR(50) VNN
+    CP(IdEmp)
+Puesto (
+	IdP  INT  VNN
+	Desc VARCHAR(50)
+    Empleado INT VNN                  #Ocupa
+	CP(IdP)
+    CAJ Empleado-&gt;Empleado.IdEmpleado #Ocupa
+)
+</code>
+Es el mismo caso anterior y se hace igual, pero para conseguir la cardinalidad mínima uno del lado uno, esto es, que todo puesto tenga asignado un empleado no permitiremos dejar a nulo la clave ajena poniendo _VNN</em>.</p>
+
+<p><strong>Resumen:</strong>
+- Pasar la CP del lado uno al lado muchos como clave ajena y ponerla como VNN.</p>
+
+<p>##Relación (0,1)-(1,N)</p>
+
+<p><img src="/downloads/Relación_1N_01_1N.png" alt="Relación_1N_01_1N.png" /></p>
+
+<p>Como ya hemos comentado anteriormente, la restricción 1,N no podemos conseguirla. Por lo tanto se resuelve como una relación (0,1)-(0,N) y se deberá controlar la cardinalidad mínima uno en la aplicación o mediante disparadores en la BD tal y como se explicó en la relaciones N:M.</p>
+
+<p>##Relación (1,1)-(1,N)</p>
+
+<p><img src="/downloads/Relación_1N_11_1N.png" alt="Relación_1N_11_1N.png" /></p>
+
+<p>Se resuelve como una relación (1,1)-(0,N) y no podemos conseguir la cardinalidad mínima 1 del lado muchos.</p>
+
+<p>##Relaciones 1:N con atributos</p>
+
+<p>No es normal encontrarnos con relaciones 1:N con atributos propios de la relación. Veamos el siguiente ejemplo:</p>
+
+<p><img src="/downloads/Relación_1N_01_0N_Atributo.png" alt="Relación_1N_01_0N_Atributo.png" /></p>
+
+<p>Poniendo el atributo <em>Turno</em> en la relación indicamos que no pertenece a la entidad <em>Puesto</em>, es decir: no es cierto que cada puesto tiene un turno. Tampoco lo ponemos en la entidad empleado con lo que tampoco debe ocurrir que cada empleado tenga un turno. Al poner el atributo <em>Turno</em> en la relación estamos indicando que sólo debe existir un turno cuando algún empleado esté ocupando un puesto y, en este caso, debe ser obligatorio (ya que lo hemos puesto con linea continua).</p>
+
+<p>Casi siempre, este tipo de atributos se suelen poner en el lado muchos de la relación. Si fuese imprescindible ponerlo en la relación y hacer que se cumpla deberemos hacerlo mediante programación o usando una solución un poco más compleja, es decir creando una nueva tabla:</p>
+
+<pre><code class="language-Ruby">Empleado (
+	IdEmp   INT         VNN
+	Nombre  VARCHAR(50) VNN
+    CP(IdEmp)
+Puesto (
+	IdP  INT  VNN
+	Desc VARCHAR(50)
+	CP(IdP)
+)
+Ocupa (
+	Empleado: INT  VNN
+	Puesto:   INT  VNN
+	Turno:    VARCHAR(50) VNN
+    CP(Puesto)
+	CAj (Empleado-&gt;DNI)
+	CAj (Puesto-&gt;CodP)
+)
+</code></pre>
+
+<p>#Relaciones 1:1</p>
+
+<p>Las relaciones uno a uno son difíciles de encontrar y muchas veces responden a la necesidad de dividir una tabla en dos para tener un acceso muy rápido a ella guardándola en memoria RAM y manteniendo la otra parte que <em>pesará</em> mucho más en disco. También se puede dividir una tabla en dos para aplicales a cada una diferentes requerimientos, por ejemplo de copia de seguridad.</p>
+
+<p>##Relación (0,1)-(0,1)</p>
+
+<p><img src="/downloads/Relación_11_01_01.png" alt="Relación_11_01_01.png" /></p>
+
+<pre><code class="language-Ruby">Empleado (
+	IdEmp   INT         VNN
+	Nombre  VARCHAR(50) VNN
+    CP(IdEmp)
+Puesto (
+	IdP  INT  VNN
+	Desc VARCHAR(50)
+    Empleado INT                      #Ocupa
+	CP(IdP)
+    CALT(Empleado)                    #Ocupa
+    CAJ Empleado-&gt;Empleado.IdEmpleado #Ocupa
+)
+</code></pre>
+<p><strong>Resumen:</strong>
+- Pasar la CP de un lado al otro como clave ajena y ponerla como CALT.</p>
+
+<p>##Relación (1,1)-(0,1)</p>
+
+<p><img src="/downloads/Relación_11_11_01.png" alt="Relación_11_11_01.png" /></p>
+
+<p>Este es el mismo caso anterior, pero definiremos la CAJ como VNN para asegurarnos que todo ejemplar de <em>Puesto</em> tendrá asignado como mínimo un empleado.</p>
+
+<pre><code class="language-Ruby">Empleado (
+	IdEmp   INT         VNN
+	Nombre  VARCHAR(50) VNN
+    CP(IdEmp)
+Puesto (
+	IdP  INT  VNN
+	Desc VARCHAR(50)
+    Empleado INT VNN                  #Ocupa
+	CP(IdP)
+    CALT(Empleado)                    #Ocupa
+    CAJ Empleado-&gt;Empleado.IdEmpleado #Ocupa
+)
+</code></pre>
+
+<p><strong>Resumen:</strong>
+- Pasar la CP del lado 1,1 al otro como clave ajena y ponerla como CALT y VNN.</p>
+
+<p>##Relación (0,1)-(1,1)</p>
+
+<p><img src="/downloads/Relación_11_01_11.png" alt="Relación_11_01_11.png" /></p>
+
+<p>Es el mismo caso anterior, pero dándole la vuelta.</p>
+
+<pre><code class="language-Ruby">Empleado (
+	IdEmp   INT         VNN
+	Nombre  VARCHAR(50) VNN
+    Puesto INT VNN            #Ocupa
+    CP(IdEmp)
+    CALT(Puesto)              #Ocupa
+    CAJ Puesto-&gt;Puesto.IdP    #Ocupa
+Puesto (
+	IdP  INT  VNN
+	Desc VARCHAR(50)
+	CP(CodP)
+)
+</code></pre>
+
+<p>##Relación (1,1)-(1,1)</p>
+
+<p><img src="/downloads/Relación_11_11_11.png" alt="Relación_11_11_11.png" /></p>
+
+<p>Una de las opciones es hacerla igual que la relación (1,1)-(0,1) y conseguir mediante la aplicación o mediante un disparador en la BD que se cumpla la otra cardinalidad mínima.</p>
+
+<p>Otra solución consiste en juntar todos los atributos en una sóla tabla, pero claro, si hemos separado las tablas intencionadamente, no sirve.</p>
+
+<pre><code class="language-Ruby">EmpleadoPuesto (
+	IdEmp   INT         VNN
+	Nombre  VARCHAR(50) VNN
+	IdP     INT  VNN
+	Desc VARCHAR(50)
+    CP(IdEmp)
+	CALT(IdP)
+)
+</code></pre>
+
+<p><strong>Resumen:</strong>
+- Juntar las dos entidades en una sóla y definir una CP como CP y la otra como CALT.</p>
+
+<p>##Relaciones 1:1 con atributos</p>
+
+<p><img src="/downloads/Relación_11_01_01_Atributo.png" alt="Relación_11_01_01_Atributo.png" /></p>
+
+<p>Tal y como vimos en las <em>Relaciones 1:N con atributos</em>, también es muy infrecuente poner atributos a las relaciones 1:1. En estos casos, se suele trasladar a alguna de las dos entidades participantes en la relación.</p>
+
+<p>#Dependencia de Existencia</p>
+
+<p><img src="/downloads/Dependencia_Existencia.png" alt="Dependencia_Existencia.png" /></p>
+
+<p>En la notación clásica de Chen se representa la dependencia de existencia por las letras <em>Ex</em> dentro del rombo de la relación y marcando la entidad débil con un doble cuadro. La entidad débil es la que necesita de la otra para existir. En el caso de una biblioteca está claro que para que exista un ejemplar de <em>El Quijote</em> es necesario que ese libro esté dado de alta, sin embargo si que sería posible tener <em>El Quijote</em> como libro, pero no disponer momentáneamente de ningún ejemplar porque han resultado dañados por ejemplo.</p>
+
+<p>En la notación min-max dependencia de existencia ya viene representada por la cardinalidad 1,1. En este caso se indica que todo <em>Ejemplar</em> debe tener asociado como mínimo un libro, es decir, que para que exista un ejemplar, debe existir uno un sólo un libro con el que estará relacionado.</p>
+
+<p>Como en la notación clásica de Chen no se ponían las cardinalidades mínimas, sólo se ponían las máximas, tuvieron que inventarse un método para representar esa cardinalidad mínima 1 que requiere la dependencia de existencia.</p>
+
+<p>Por lo tanto, las dependencias de existencia las trataremos como una relación uno a muchos del tipo (1,1)-(0,N) normal.</p>
+
+<pre><code class="language-Ruby">Libro (
+	IdLibro INT         VNN
+	Título  VARCHAR(50) VNN
+    CP(IdLibro)
+Ejemplar (
+	IdEjemplar INT         VNN
+	Estado     VARCHAR(50)
+    Libro      INT         VNN   #Tiene
+	CP(IdEjemplar)
+    CAJ Libro-&gt;Libro.IdLibro     #Tiene
+)
+</code></pre>
+
+<p>#Dependencia de identificación</p>
+
+<p><img src="/downloads/Dependencia_Identificacion.png" alt="Dependencia_Identificacion.png" /></p>
+
+<p>En una dependencia de identificación, además de tener una dependencia de existencia, para identificar correctamente al <em>Ejemplar</em> necesitaremos identificar al <em>Libro</em>. Esto ocurre si numeramos los ejemplares de <em>El Quijote</em> como 1, 2, 3 y 4; y los ejemplares de <em>La Celestina</em> como 1, 2 y 3. Si le pedimos a alguien que nos traiga el ejemplar 2, nos responderá: “Vale, pero ¿de qué libro?”</p>
+
+<p>La notación min-max no puede representar las dependencias de existencia, por lo que aunque usemos esta notación, si tenemos una dependencia de existencia deberemos indicarla, como mínimo poniendo <em>Id</em> en la relación. La entidad débil ya sabemos que es la que está en el lado muchos de la relación.</p>
+
+<p>Para representar una dependencia de identificación la trataremos como una relación uno a muchos del tipo (1,1)-(0,N) normal pero ampliaremos la CP de la entidad débil con la CAJ de la relación:</p>
+
+<pre><code class="language-Ruby">Libro (
+	IdLibro INT         VNN
+	Título  VARCHAR(50) VNN
+    CP(IdLibro)
+Ejemplar (
+	IdEjemplar INT         VNN
+	Estado     VARCHAR(50)
+    Libro      INT         VNN   #Tiene
+	CP(IdEjemplar,Libro)         #Tiene
+    CAJ Libro-&gt;Libro.IdLibro     #Tiene
+)
+</code></pre>
+
+<p>#Relaciones reflexivas
+##Método general</p>
+
+<p><img src="/downloads/Relación_Reflexiva_01_01.png" alt="Relación_Reflexiva_01_01.png" /></p>
+
+<p>Como método general para transformar una relación reflexiva, la <em>abriremos</em> repitiendo la entidad para convertirla en una relación binaria y la trataremos como tal.</p>
+
+<p><img src="/downloads/Relación_Reflexiva_01_01_Desmontada.png" alt="Relación_Reflexiva_01_01_Desmontada.png" /></p>
+
+<p>##Relación (0,1)-(0,1)</p>
+
+<p><img src="/downloads/Relación_Reflexiva_01_01.png" alt="Relación_Reflexiva_01_01.png" /></p>
+
+<p>Desglosamos la relación y la tratamos como una relación (0,1)-(0,1) normal.</p>
+
+<pre><code class="language-Ruby">Persona (
+	DNI    VARCHAR(10) VNN
+	Nombre VARCHAR(50) VNN
+    Mujer  VARCHAR(10)      (Está casada)
+    CP(DNI)
+    UNIQUE(Mujer)           (Está casada)
+    CAJ Mujer-&gt;Perdona.DNI  (Está casada)
+</code></pre>
+
+<p>##Relación (1,1)-(0,N)</p>
+
+<p><img src="/downloads/Relación_Reflexiva_11_0N.png" alt="Relación_Reflexiva_11_0N.png" /></p>
+
+<p>Desglosamos la relación y la tratamos como una relación (1,1)-(0,N) normal. En este caso hemos preferido una cardinalidad mínima de uno para el lado uno de la relación. Esto quiere decir que todo empleado debe tener como mínimo un superior, por lo que el jefe <em>supremo</em> deberá ser jefe de sí mismo. Lo vemos con un ejemplo de las tablas:</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>DNI</th>
+      <th>Nombre</th>
+      <th>Jefe</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>101</td>
+      <td>Luis</td>
+      <td>101</td>
+    </tr>
+    <tr>
+      <td>102</td>
+      <td>Ana</td>
+      <td>101</td>
+    </tr>
+    <tr>
+      <td>103</td>
+      <td>Pedro</td>
+      <td>102</td>
+    </tr>
+    <tr>
+      <td>104</td>
+      <td>Antonio</td>
+      <td>103</td>
+    </tr>
+    <tr>
+      <td>105</td>
+      <td>Juan</td>
+      <td>102</td>
+    </tr>
+    <tr>
+      <td>106</td>
+      <td>Julia</td>
+      <td>105</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>Como podemos ver Luis debe ser jefe de sí mismo para poder asegurar que todo empleado tiene como mínimo un jefe.
+<code class="highlighter-rouge">Ruby
+Empleado (
+	DNI    VARCHAR(10) VNN
+	Nombre VARCHAR(50) VNN
+    Jefe   VARCHAR(10) VNN  (Dirigir)
+    CP(DNI)
+    CAJ Jefe-&gt;Empleado.DNI  (Dirigir)
+</code></p>
+
+<p>##Relación (0,N)-(0,M)</p>
+
+<p><img src="/downloads/Relación_Reflexiva_0N_0M.png" alt="Relación_Reflexiva_0N_0M.png" /></p>
+
+<p>Desglosamos la relación y la tratamos como una relación (0,N)-(0,M) normal.</p>
+
+<pre><code class="language-Ruby">Persona (
+	DNI    VARCHAR(10) VNN
+	Nombre VARCHAR(50) VNN
+    CP(DNI)
+)
+Enseña (
+    Profesor VARCHAR(10) VNN
+    Alumno   VARCHAR(10) VNN
+    CP(Profesor,Alumno)
+    CAJ Profesor-&gt;Persona.DNI
+    CAJ Alumno  -&gt;Persona.DNI
+)
+</code></pre>
+
+<p>##Paso del modelo lógico al modelo entidad-relación</p>
+
+<p>En algunos casos tendremos ya hecho el modelo lógico y necesitaremos obtener el modelo entidad-relación. Veamos unos ejemplos:</p>
+
+<p>##Relaciones 1:N</p>
+
+<p>Las relaciones 1:N del modelo entidad-relación se pueden reconocer en el modelo lógico por la presencia de una CAJ. Siempre que encontremos una restricción de CAJ sobre un campo y que los valores de dicho campo se puedan repetir, esto es no es ni CP, ni CALT, ni UNIQUE tendremos una relación uno a muchos. La tabla donde está definida la CAJ es el lado muchos de la relación y la tabla a donde apunta la CAJ será el lado uno.</p>
+
+<pre><code class="language-Ruby">Empleado (
+	IdEmp   INT         VNN
+	Nombre  VARCHAR(50) VNN
+    CP(IdEmp)
+Puesto (
+	IdP  INT  VNN
+	Desc VARCHAR(50)
+    Empleado INT
+	CP(IdP)
+    CAJ Empleado-&gt;Empleado.IdEmpleado
+)
+</code></pre>
+
+<p>En este ejemplo, vemos como <em>Empleado</em> tiene definida una restricción de CAJ. Además, <em>Empleado</em> no es ni CP, ni CALT, ni UNIQUE por lo que tenemos una relación uno a muchos en la que <em>Puesto</em> es el lado muchos y <em>Empleado</em> es el lado uno.</p>
+
+<p><img src="/downloads/Relación_1N_01_0N.png" alt="Relación_1N_01_0N.png" /></p>
+
+<p>La cardinalidad mínima del lado muchos siempre será 0 y la del lado uno dependerá de si el atributo que tiene la restricción de CAJ tiene, además, la restricción de VNN.</p>
+
+<h2 id="relaciones-nm">Relaciones N:M</h2>
+
+<p>Partiendo de las siguientes tres tablas</p>
+
+<pre><code class="language-Ruby">Empleado (
+	IdEmp   INT         VNN
+	Nombre  VARCHAR(50) VNN
+    CP(IdEmp)
+Puesto (
+	IdP  INT  VNN
+	Desc VARCHAR(50)
+	CP(IdP)
+)
+Ocupa (
+	Empleado: INT VNN
+	Puesto:   INT  VNN
+	Turno:    VARCHAR(50) VNN
+	CP(Empleado,Puesto)
+	CAJ Empleado-&gt;Empleado.IdEmp
+	CAJ Puesto  -&gt;Puesto.CodP
+)
+</code></pre>
+
+<p>y basándonos en lo visto en el punto anterior. Si para hacer el modelo entidad-relación creamos una entidad por cada tabla y establecemos las relaciones, nos quedaría algo así:</p>
+
+<p><img src="/downloads/Relación_NM_11_0N_0N_11.png" alt="Dos relaciones 1,1 0,N" />
+La mayoría de veces en las que tengamos dos relaciones 1,1 en un extremo y 0,N en el otro apuntando a una tabla, eso se suele traducir en el modelo entidad-relación como una relación muchos a muchos:</p>
+
+<p><img src="/downloads/Relación_NM_0N_0M.png" alt="Relación muchos a muchos 0,N 0,M" />
+Pero no siempre tiene porqué ser así. Partiendo del siguiente caso:</p>
+
+<p><img src="/downloads/Relación_NM_11_0N_0N_11_Autor_Libro.png" alt="Relación_NM_11_0N_0N_11_Autor_Libro.png" /></p>
+
+<p>Este es un caso evidente en el que las dos relaciones 1,1; 0,N son una única relación muchos a muchos:</p>
+
+<p><img src="/downloads/Relación_NM_0N_0M_ExplansionCP_Autor_Libro.png" alt="Relación_NM_0N_0M_ExplansionCP_Autor_Libro.png" /></p>
+
+<p>Sin embargo sin en vez de tratarse de una biblioteca se trata de una editorial en la que el echo de escribir es algo muy importante de la cual queremos guardar información como la fecha en la que se empezó a escribir un libro, la fecha en la que se acabó de escribir y relaciones como las revisiones que ha tenido ese libro que está siendo escrito por uno de varios autores; por parte del editor. En casos más complejos como este, es posible que es quiera contemplar <em>Escribe</em> como una entidad en vez de como una relación muchos a muchos.</p>
+
+<p><img src="/downloads/Relación_NM_0N_0M_ExplansionCP_Escribe_como_entidad.png" alt="Relación_NM_0N_0M_ExplansionCP_Escribe_como_entidad.png" /></p>
+
+<p>##Relaciones 1:1</p>
+
+<p>Las relaciones 1:1 son iguales que las 1:N, pero sobre la CAJ, además hay definida una restricción que normalmente será de UNIQUE, pero que también podría ser de CALT o CP. Así:</p>
+
+<pre><code class="language-Ruby">Empleado (
+	IdEmp   INT         VNN
+	Nombre  VARCHAR(50) VNN
+    CP(IdEmp)
+Puesto (
+	IdP  INT  VNN
+	Desc VARCHAR(50)
+    Empleado INT
+	CP(IdP)
+    CALT(Empleado)
+    CAJ Empleado-&gt;Empleado.IdEmpleado
+)
+</code></pre>
+
+<p>Se convertirá en:</p>
+
+<p><img src="/downloads/Relación_11_01_01.png" alt="Relación_11_01_01.png" /></p>
+
+<p>##Relaciones reflexivas</p>
+
+<p>Las relaciones reflexivas , en general, se reconocen por haber una CAJ que apunta a la misma tabla:</p>
+
+<pre><code class="language-Ruby">Persona (
+	DNI    VARCHAR(10) VNN
+	Nombre VARCHAR(50) VNN
+    Mujer  VARCHAR(10)      (Está casada)
+    CP(DNI)
+    UNIQUE(Mujer)           (Está casada)
+    CAJ Mujer-&gt;Perdona.DNI  (Está casada)
+</code></pre>
+
+<p>Se convierte en:</p>
+
+<p><img src="/downloads/Relación_Reflexiva_01_01.png" alt="Relación_Reflexiva_01_01.png" /></p>
+
+<p>La excepción son las relaciones muchos a muchos reflexivas. A ver las tablas:</p>
+
+<pre><code class="language-Ruby">Persona (
+	DNI    VARCHAR(10) VNN
+	Nombre VARCHAR(50) VNN
+    CP(DNI)
+)
+Enseña (
+    Profesor VARCHAR(10) VNN
+    Alumno   VARCHAR(10) VNN
+    CP(Profesor,Alumno)
+    CAJ Profesor-&gt;Persona.DNI
+    CAJ Alumno  -&gt;Persona.DNI
+)
+</code></pre>
+<p>y pasarlas al modelo entidad relación nos debería quedar algo parecido a este modelo entidad-relación:</p>
+
+<p><img src="/downloads/Relación_Reflexiva_0N_0M_Desglosada.png" alt="Relación_Reflexiva_0N_0M_Desglosada.png" /></p>
+
+<p>Como ya hemos comentado en el apartado de las relaciones N:M, la estructura de dos relaciones (1,1)-(0,N) sobre la misma entidad representa una relación muchos a muchos, con lo que el modelo entidad relación final, quedaría así:</p>
+
+<p><img src="/downloads/Relación_Reflexiva_0N_0M.png" alt="Relación_Reflexiva_0N_0M.png" /></p>
+
+<p>#Resumen</p>
+
+<p><strong>Entidades</strong></p>
+
+<ul>
+  <li>Cadad entidad se transforma en una tabla</li>
+</ul>
+
+<p><strong>Relaciones N:M</strong></p>
+
+<ul>
+  <li>Crear una tabla nueva con las CP de cada una de las tablas y definirlas como CAJ y VNN. Definir como CP de la nueva tabla la unión de las dos CP de cada una de las tablas. Si la relación tiene atributos, añadirlos a la nueva tabla.</li>
+  <li>Las restricciones 1:N sólo se podrán cumplir mediante programación.</li>
+  <li>En todos los casos se deberá decidir si la CP necesita <em>expandirse</em>. Si la CP se vuelve muy compleja, es mejor poner un nuevo campo autonumérico como CP.</li>
+</ul>
+
+<p><strong>Relaciones 1:N</strong></p>
+
+<ul>
+  <li>Pasar la CP del lado uno al lado muchos como clave ajena.</li>
+  <li>Estas relaciones no suelen tener atributos.</li>
+  <li>Las restricciones 1:N sólo se podrán cumplir mediante programación.</li>
+  <li>Las restricciones 1:1 se consiguen definiendo la CAJ como VNN</li>
+</ul>
+
+<p><strong>Relaciones 1:1</strong></p>
+
+<ul>
+  <li>Pasar la CP de un lado al otro como clave ajena y ponerla como CALT.</li>
+  <li>Estas relaciones no suelen tener atributos.</li>
+  <li>Las restricciones 1:1 se consiguen definiendo la CAJ como VNN</li>
+  <li>La relación (1,1)-(1,1) se puede conseguir juntando las dos entidades en una sóla tabla</li>
+</ul>
+
+<p><strong>Dependencias de existencia e identificación</strong>
+- Las dependencias de existencia se tratan como una relación (1,1)-(0,N) Normal
+- Las dependencias de identificación se tratan como una relación (1,1)-(0,N) Normal y, además, se amplia la CP con la CAJ.</p>
+
+<p><strong>Relaciones reflexivas</strong></p>
+
+<ul>
+  <li>La entidad que tiene la relación reflexiva la duplicaremos creando una relación normal y la trataremos como tal.</li>
+</ul>
+
+<p><strong>Paso del modelo lógico la modelo entidad-relación</strong></p>
+
+<ul>
+  <li>Las CAJ representan una relación 1:N</li>
+  <li>Si nos encontramos dos relaciones (1,1)-(0,N) apuntando a la misma entidad, casi seguro que es una relación N:M.</li>
+  <li>Si además de como CAJ, un atributo está definido como UNIQUE, CALT o CP crearemos una relación 1:1</li>
+</ul>
+
+<p>#Licencia
+<a rel="license" href="http://creativecommons.org/licenses/by-sa/4.0/"><img alt="Creative Commons License" style="border-width:0" src="https://i.creativecommons.org/l/by-sa/4.0/88x31.png" /></a><br /><span xmlns:dct="http://purl.org/dc/terms/" href="http://purl.org/dc/dcmitype/Text" property="dct:title" rel="dct:type">Apuntes de Bases de Datos</span> by <span xmlns:cc="http://creativecommons.org/ns#" property="cc:attributionName">Simón Llinares Riestra</span> is licensed under a <a rel="license" href="http://creativecommons.org/licenses/by-sa/4.0/">Creative Commons Attribution-ShareAlike 4.0 International License</a>.</p>
